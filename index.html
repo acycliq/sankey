@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Sankey Diagram – Misclassifications & Gene Contributions</title>
+  <!-- Load Google Font -->
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans:400,600&display=swap" rel="stylesheet">
+  <!-- Load Plotly and d3 libraries from CDNs -->
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <script src="https://d3js.org/d3.v5.min.js"></script>
+  <style>
+    body {
+      font-family: 'Open Sans', sans-serif;
+      background-color: #f4f6f8;
+      margin: 10px;
+      color: #333;
+    }
+    h2 {
+      margin-bottom: 10px;
+      font-weight: 600;
+      color: #2c3e50;
+    }
+    .filter-panel {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .dropdown-container {
+      flex: 1;
+      min-width: 200px;
+    }
+    label {
+      font-weight: 600;
+      display: block;
+      margin-bottom: 3px;
+      color: #34495e;
+    }
+    select {
+      width: 100%;
+      padding: 6px 8px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background-color: #fff;
+      box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+      transition: border-color 0.2s ease-in-out;
+    }
+    select:focus {
+      outline: none;
+      border-color: #2c3e50;
+    }
+    #sankey-container {
+      height: 800px;
+      border: 1px solid #ddd;
+      padding: 10px;
+      background-color: #fff;
+      box-shadow: 0px 2px 6px rgba(0,0,0,0.1);
+    }
+  </style>
+</head>
+<body>
+  <h2>Sankey Diagram – Misclassifications Flow & Gene Contributions</h2>
+  <div class="filter-panel">
+    <div class="dropdown-container">
+      <label for="dropdown-actual">Select Actual node:</label>
+      <select id="dropdown-actual">
+        <option value="">(All)</option>
+      </select>
+    </div>
+    <div class="dropdown-container">
+      <label for="dropdown-predicted">Select Predicted node:</label>
+      <select id="dropdown-predicted">
+        <option value="">(All)</option>
+      </select>
+    </div>
+    <div class="dropdown-container">
+      <label for="dropdown-gene">Select Gene node:</label>
+      <select id="dropdown-gene">
+        <option value="">(All)</option>
+      </select>
+    </div>
+  </div>
+  <div id="sankey-container"></div>
+
+  <script>
+    /*******************
+     * Global Variables
+     *******************/
+    let fullData = []; // Will hold the complete TSV data.
+
+    /*******************
+     * Utility Functions
+     *******************/
+    function makeKey(...args) {
+      return args.join("|");
+    }
+
+    function parseGeneData(row) {
+      let genes = [];
+      let counts = [];
+      try {
+        genes = (typeof row.top5_genes === 'string')
+                ? JSON.parse(row.top5_genes.replace(/'/g, '"'))
+                : row.top5_genes;
+      } catch (e) {
+        genes = [];
+      }
+      try {
+        counts = (typeof row.top5_gene_counts === 'string')
+                ? JSON.parse(row.top5_gene_counts.replace(/'/g, '"'))
+                : row.top5_gene_counts;
+      } catch (e) {
+        counts = [];
+      }
+      return { genes, counts };
+    }
+
+    /**************************************
+     * Build Dictionaries from Data
+     **************************************/
+    function buildDictionaries(data) {
+      const actualToPred = {};
+      const predToGene = {};
+      data.forEach(row => {
+        const actual = row.Actual_class;
+        const predicted = row.Best_class;
+        const keyAP = makeKey(actual, predicted);
+        actualToPred[keyAP] = (actualToPred[keyAP] || 0) + 1;
+        const { genes, counts } = parseGeneData(row);
+        if (genes.length === counts.length) {
+          genes.forEach((gene, i) => {
+            const keyPG = makeKey(predicted, gene);
+            predToGene[keyPG] = (predToGene[keyPG] || 0) + parseFloat(counts[i]);
+          });
+        }
+      });
+      return { actualToPred, predToGene };
+    }
+
+    /**************************************
+     * Build Node Sets from Dictionaries
+     **************************************/
+    function buildNodeSets(act2pred, pred2gene) {
+      const actualNodes = new Set();
+      const predictedNodes = new Set();
+      const geneNodes = new Set();
+
+      Object.keys(act2pred).forEach(key => {
+        const [a, p] = key.split("|");
+        actualNodes.add("Actual: " + a);
+        predictedNodes.add("Predicted: " + p);
+      });
+      Object.keys(pred2gene).forEach(key => {
+        const [p, gene] = key.split("|");
+        predictedNodes.add("Predicted: " + p);
+        geneNodes.add("Gene: " + gene);
+      });
+      return { actualNodes, predictedNodes, geneNodes };
+    }
+
+    /**************************************
+     * Build Nodes & Links for Sankey Diagram
+     **************************************/
+    function buildSankeyData(act2pred, pred2gene) {
+      const { actualNodes, predictedNodes, geneNodes } = buildNodeSets(act2pred, pred2gene);
+      const allNodes = Array.from(new Set([...actualNodes, ...predictedNodes, ...geneNodes]));
+      const nodeIdx = {};
+      allNodes.forEach((node, i) => nodeIdx[node] = i);
+
+      const sources = [];
+      const targets = [];
+      const values = [];
+
+      Object.keys(act2pred).forEach(key => {
+        const [act, pred] = key.split("|");
+        const src = "Actual: " + act;
+        const tgt = "Predicted: " + pred;
+        sources.push(nodeIdx[src]);
+        targets.push(nodeIdx[tgt]);
+        values.push(act2pred[key]);
+      });
+
+      Object.keys(pred2gene).forEach(key => {
+        const [pred, gene] = key.split("|");
+        const src = "Predicted: " + pred;
+        const tgt = "Gene: " + gene;
+        sources.push(nodeIdx[src]);
+        targets.push(nodeIdx[tgt]);
+        values.push(pred2gene[key]);
+      });
+
+      return { allNodes, sources, targets, values };
+    }
+
+    /**************************************
+     * Build Plotly Sankey Figure
+     **************************************/
+    function buildSankeyFigure(nodes, sources, targets, values, title) {
+      return {
+        data: [{
+          type: "sankey",
+          orientation: "h",
+          node: {
+            pad: 15,
+            thickness: 20,
+            line: { color: "black", width: 0.5 },
+            label: nodes,
+          },
+          link: {
+            source: sources,
+            target: targets,
+            value: values,
+          }
+        }],
+        layout: {
+          title: title,
+          font: { size: 10 },
+          height: 800
+        }
+      };
+    }
+
+    /**************************************
+     * Dropdown Utilities
+     **************************************/
+    function makeOptions(nodesSet) {
+      return Array.from(nodesSet).sort().map(d => `<option value="${d}">${d}</option>`);
+    }
+
+    function updateDropdowns(dicts) {
+      const { actualNodes, predictedNodes, geneNodes } = buildNodeSets(dicts.actualToPred, dicts.predToGene);
+      function updateDropdown(id) {
+        const dropdown = document.getElementById(id);
+        const current = dropdown.value;
+        const setData = id === "dropdown-actual" ? actualNodes : id === "dropdown-predicted" ? predictedNodes : geneNodes;
+        const optionsHTML = '<option value="">(All)</option>' + makeOptions(setData).join("");
+        dropdown.innerHTML = optionsHTML;
+        if ([...setData].includes(current)) {
+          dropdown.value = current;
+        } else {
+          dropdown.value = "";
+        }
+      }
+      updateDropdown("dropdown-actual");
+      updateDropdown("dropdown-predicted");
+      updateDropdown("dropdown-gene");
+    }
+
+    /**************************************
+     * Filtering and Updating Sankey Diagram
+     **************************************/
+    function updateSankey() {
+      const selActual = document.getElementById("dropdown-actual").value;
+      const selPredicted = document.getElementById("dropdown-predicted").value;
+      const selGene = document.getElementById("dropdown-gene").value;
+
+      let filteredData = fullData;
+      if (selActual) {
+        const actualVal = selActual.replace("Actual: ", "").trim();
+        filteredData = filteredData.filter(d => d.Actual_class === actualVal);
+      }
+      if (selPredicted) {
+        const predVal = selPredicted.replace("Predicted: ", "").trim();
+        filteredData = filteredData.filter(d => d.Best_class === predVal);
+      }
+      if (selGene) {
+        const geneVal = selGene.replace("Gene: ", "").trim();
+        filteredData = filteredData.filter(d => {
+          try {
+            const arr = (typeof d.top5_genes === 'string')
+                        ? JSON.parse(d.top5_genes.replace(/'/g, '"'))
+                        : d.top5_genes;
+            return arr.includes(geneVal);
+          } catch (e) {
+            return false;
+          }
+        });
+      }
+
+      const filteredDicts = buildDictionaries(filteredData);
+      const sankeyData = buildSankeyData(filteredDicts.actualToPred, filteredDicts.predToGene);
+      let titleParts = [];
+      if (selActual) titleParts.push(selActual);
+      if (selPredicted) titleParts.push(selPredicted);
+      if (selGene) titleParts.push(selGene);
+      const title = titleParts.length ? "Focused view: " + titleParts.join(", ") : "Full Diagram";
+
+      const fig = buildSankeyFigure(sankeyData.allNodes, sankeyData.sources, sankeyData.targets, sankeyData.values, title);
+      Plotly.react("sankey-container", fig.data, fig.layout);
+
+      updateDropdowns(filteredDicts);
+    }
+
+    /**************************************
+     * Initialization
+     **************************************/
+    d3.tsv("processed_simulations.tsv").then(function(data) {
+      fullData = data;
+      const dicts = buildDictionaries(fullData);
+      const sankeyData = buildSankeyData(dicts.actualToPred, dicts.predToGene);
+      const fig = buildSankeyFigure(
+        sankeyData.allNodes,
+        sankeyData.sources,
+        sankeyData.targets,
+        sankeyData.values,
+        "Sankey Diagram: Misclassifications Flow & Gene Contributions"
+      );
+      Plotly.newPlot("sankey-container", fig.data, fig.layout);
+      updateDropdowns(dicts);
+    }).catch(function(error) {
+      console.error("Error loading TSV data:", error);
+    });
+
+    document.getElementById("dropdown-actual").addEventListener("change", updateSankey);
+    document.getElementById("dropdown-predicted").addEventListener("change", updateSankey);
+    document.getElementById("dropdown-gene").addEventListener("change", updateSankey);
+  </script>
+</body>
+</html>
