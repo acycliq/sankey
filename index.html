@@ -33,6 +33,10 @@
       flex: 1;
       min-width: 180px;
     }
+    /* Make the simulation dropdown container smaller */
+    #simulation-container {
+      max-width: 150px;
+    }
     label {
       font-weight: 600;
       display: block;
@@ -67,7 +71,7 @@
 
   <!-- All dropdowns in a single row, with Simulation at the far left -->
   <div class="filter-panel filter-row">
-    <div class="dropdown-container">
+    <div class="dropdown-container" id="simulation-container">
       <label for="dropdown-simulation">Select Simulation:</label>
       <select id="dropdown-simulation">
         <option value="">(All)</option>
