@@ -25,17 +25,17 @@
     }
     .filter-row {
       display: flex;
-      flex-wrap: wrap;
+      align-items: flex-end;
       gap: 10px;
       margin-bottom: 10px;
+      flex-wrap: wrap;
     }
     .dropdown-container {
-      flex: 1;
-      min-width: 180px;
+      /* let each container determine its width */
     }
-    /* Make the simulation dropdown container smaller */
-    #simulation-container {
-      max-width: 150px;
+    /* Simulation dropdown: fix its width to 100px */
+    #simulation-container select {
+      width: 100px;
     }
     label {
       font-weight: 600;
@@ -50,7 +50,7 @@
       border: 1px solid #ccc;
       border-radius: 4px;
       background-color: #fff;
-      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+      box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
       transition: border-color 0.2s ease-in-out;
     }
     select:focus {
@@ -62,35 +62,35 @@
       border: 1px solid #ddd;
       padding: 10px;
       background-color: #fff;
-      box-shadow: 0px 2px 6px rgba(0, 0, 0, 0.1);
+      box-shadow: 0px 2px 6px rgba(0,0,0,0.1);
     }
   </style>
 </head>
 <body>
   <h2>Sankey Diagram – Misclassifications, Genes & Simulation Filter</h2>
 
-  <!-- All dropdowns in a single row, with Simulation at the far left -->
+  <!-- All dropdowns in a single row. Simulation dropdown is first -->
   <div class="filter-panel filter-row">
     <div class="dropdown-container" id="simulation-container">
-      <label for="dropdown-simulation">Select Simulation:</label>
+      <label for="dropdown-simulation">Simulation:</label>
       <select id="dropdown-simulation">
         <option value="">(All)</option>
       </select>
     </div>
     <div class="dropdown-container">
-      <label for="dropdown-actual">Select Actual node:</label>
+      <label for="dropdown-actual">Actual:</label>
       <select id="dropdown-actual">
         <option value="">(All)</option>
       </select>
     </div>
     <div class="dropdown-container">
-      <label for="dropdown-predicted">Select Predicted node:</label>
+      <label for="dropdown-predicted">Predicted:</label>
       <select id="dropdown-predicted">
         <option value="">(All)</option>
       </select>
     </div>
     <div class="dropdown-container">
-      <label for="dropdown-gene">Select Gene node:</label>
+      <label for="dropdown-gene">Gene:</label>
       <select id="dropdown-gene">
         <option value="">(All)</option>
       </select>
@@ -103,7 +103,7 @@
     /*******************
      * Global Variables
      *******************/
-    let fullData = []; // Array to hold TSV data.
+    let fullData = [];
 
     /*******************
      * Utility Functions
@@ -111,8 +111,6 @@
     function makeKey(...args) {
       return args.join("|");
     }
-
-    // Parse gene lists and counts from a row.
     function parseGeneData(row) {
       let genes = [];
       let counts = [];
@@ -163,7 +161,6 @@
       const actualNodes = new Set();
       const predictedNodes = new Set();
       const geneNodes = new Set();
-
       Object.keys(act2pred).forEach(key => {
         const [a, p] = key.split("|");
         actualNodes.add("Actual: " + a);
@@ -189,12 +186,9 @@
       ]));
       const nodeIdx = {};
       allNodes.forEach((n, i) => nodeIdx[n] = i);
-
       const sources = [];
       const targets = [];
       const values = [];
-
-      // Actual → Predicted links.
       Object.keys(act2pred).forEach(key => {
         const [act, pred] = key.split("|");
         const src = "Actual: " + act;
@@ -203,8 +197,6 @@
         targets.push(nodeIdx[tgt]);
         values.push(act2pred[key]);
       });
-
-      // Predicted → Gene links.
       Object.keys(pred2gene).forEach(key => {
         const [pred, gene] = key.split("|");
         const src = "Predicted: " + pred;
@@ -213,7 +205,6 @@
         targets.push(nodeIdx[tgt]);
         values.push(pred2gene[key]);
       });
-
       return { allNodes, sources, targets, values };
     }
 
@@ -251,15 +242,11 @@
     function makeOptions(nodesSet) {
       return Array.from(nodesSet).sort().map(d => `<option value="${d}">${d}</option>`);
     }
-
-    // Build simulation options from the full data.
     function getUniqueSimulations(data) {
       const sims = new Set();
       data.forEach(d => sims.add(d.simulation));
       return sims;
     }
-
-    // Update dropdown menus.
     function updateDropdowns(dicts, data) {
       const nodeSets = buildNodeSets(dicts.actualToPred, dicts.predToGene);
       function updateDropdown(id, setData) {
@@ -277,7 +264,6 @@
       updateDropdown("dropdown-predicted", nodeSets.predictedNodes);
       updateDropdown("dropdown-gene", nodeSets.geneNodes);
 
-      // Update simulation dropdown.
       const simSet = getUniqueSimulations(data);
       const simDropdown = document.getElementById("dropdown-simulation");
       const currentSim = simDropdown.value;
