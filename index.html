@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Sankey Diagram – Simulation & Linked Dropdowns</title>
-  <!-- Load Google Font -->
+  <title>Sankey & Data Dashboard</title>
+  <!-- Google Fonts -->
   <link href="https://fonts.googleapis.com/css?family=Open+Sans:400,600&display=swap" rel="stylesheet">
-  <!-- Load Plotly and d3 libraries -->
+  <!-- Plotly and d3 -->
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
   <script src="https://d3js.org/d3.v5.min.js"></script>
   <style>
@@ -20,6 +20,37 @@
       font-weight: 600;
       color: #2c3e50;
     }
+    /* Tab navigation styling */
+    .tabs {
+      margin-bottom: 15px;
+    }
+    .tabs button {
+      background-color: #e0e6ed;
+      border: none;
+      color: #2c3e50;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      margin-right: 4px;
+      border-radius: 4px 4px 0 0;
+    }
+    .tabs button.active {
+      background-color: #fff;
+      border-bottom: 2px solid #fff;
+      font-weight: 600;
+    }
+    /* Container for tab contents */
+    .tab-content {
+      border: 1px solid #ddd;
+      background-color: #fff;
+      padding: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+    /* Common filter styling */
     .filter-panel {
       margin-bottom: 10px;
     }
@@ -27,19 +58,19 @@
       display: flex;
       align-items: flex-end;
       gap: 10px;
-      margin-bottom: 10px;
       flex-wrap: wrap;
+      margin-bottom: 10px;
     }
     .dropdown-container {
-      /* let each container determine its width */
+      flex: 1;
+      min-width: 140px;
     }
-    /* Simulation dropdown: fix its width to 100px */
+    /* Special styling for simulation dropdown (smaller width) */
     #simulation-container select {
       width: 100px;
     }
     label {
       font-weight: 600;
-      display: block;
       margin-bottom: 3px;
       color: #34495e;
     }
@@ -57,57 +88,103 @@
       outline: none;
       border-color: #2c3e50;
     }
+    /* Sankey container styling */
     #sankey-container {
       height: 800px;
-      border: 1px solid #ddd;
-      padding: 10px;
-      background-color: #fff;
-      box-shadow: 0px 2px 6px rgba(0,0,0,0.1);
+      margin-bottom: 15px;
+    }
+    /* Data table styling */
+    #data-table-container {
+      overflow-x: auto;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+    }
+    th, td {
+      padding: 6px;
+      border: 1px solid #ccc;
+      text-align: left;
+      font-size: 13px;
+    }
+    th {
+      background-color: #e0e6ed;
+      font-weight: 600;
+    }
+    .filter-input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 4px 6px;
+      font-size: 12px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
     }
   </style>
 </head>
 <body>
-  <h2>Sankey Diagram – Misclassifications, Genes & Simulation Filter</h2>
+  <h2>Sankey & Data Dashboard</h2>
 
-  <!-- All dropdowns in a single row. Simulation dropdown is first -->
-  <div class="filter-panel filter-row">
-    <div class="dropdown-container" id="simulation-container">
-      <label for="dropdown-simulation">Simulation:</label>
-      <select id="dropdown-simulation">
-        <option value="">(All)</option>
-      </select>
+  <!-- Tab navigation -->
+  <div class="tabs">
+    <button class="tab-link active" data-target="dashboard-tab">Dashboard</button>
+    <button class="tab-link" data-target="data-tab">Data Table</button>
+  </div>
+
+  <!-- Dashboard Tab: Sankey Diagram and dropdown filters for Sankey -->
+  <div id="dashboard-tab" class="tab-content active">
+    <div class="filter-panel filter-row">
+      <div class="dropdown-container" id="simulation-container">
+        <label for="dropdown-simulation">Simulation:</label>
+        <select id="dropdown-simulation">
+          <option value="">(All)</option>
+        </select>
+      </div>
+      <div class="dropdown-container">
+        <label for="dropdown-actual">Actual:</label>
+        <select id="dropdown-actual">
+          <option value="">(All)</option>
+        </select>
+      </div>
+      <div class="dropdown-container">
+        <label for="dropdown-predicted">Predicted:</label>
+        <select id="dropdown-predicted">
+          <option value="">(All)</option>
+        </select>
+      </div>
+      <div class="dropdown-container">
+        <label for="dropdown-gene">Gene:</label>
+        <select id="dropdown-gene">
+          <option value="">(All)</option>
+        </select>
+      </div>
     </div>
-    <div class="dropdown-container">
-      <label for="dropdown-actual">Actual:</label>
-      <select id="dropdown-actual">
-        <option value="">(All)</option>
-      </select>
+    <div id="sankey-container"></div>
+  </div>
+
+  <!-- Data Table Tab: Raw data grid with column filters -->
+  <div id="data-tab" class="tab-content">
+    <div class="filter-panel" id="table-filters">
+      <!-- Filters will be inserted here dynamically -->
     </div>
-    <div class="dropdown-container">
-      <label for="dropdown-predicted">Predicted:</label>
-      <select id="dropdown-predicted">
-        <option value="">(All)</option>
-      </select>
-    </div>
-    <div class="dropdown-container">
-      <label for="dropdown-gene">Gene:</label>
-      <select id="dropdown-gene">
-        <option value="">(All)</option>
-      </select>
+    <div id="data-table-container">
+      <table id="data-table">
+        <thead>
+          <tr id="table-header">
+            <!-- Column headers will be inserted here -->
+          </tr>
+        </thead>
+        <tbody id="table-body">
+          <!-- Data rows will be inserted here -->
+        </tbody>
+      </table>
     </div>
   </div>
 
-  <div id="sankey-container"></div>
-
   <script>
-    /*******************
-     * Global Variables
-     *******************/
+    /******************* GLOBAL VARIABLES *******************/
     let fullData = [];
 
-    /*******************
-     * Utility Functions
-     *******************/
+    /******************* UTILITY FUNCTIONS *******************/
     function makeKey(...args) {
       return args.join("|");
     }
@@ -118,22 +195,16 @@
         genes = (typeof row.top5_genes === 'string')
                 ? JSON.parse(row.top5_genes.replace(/'/g, '"'))
                 : row.top5_genes;
-      } catch (e) {
-        genes = [];
-      }
+      } catch (e) { genes = []; }
       try {
         counts = (typeof row.top5_gene_counts === 'string')
                 ? JSON.parse(row.top5_gene_counts.replace(/'/g, '"'))
                 : row.top5_gene_counts;
-      } catch (e) {
-        counts = [];
-      }
+      } catch (e) { counts = []; }
       return { genes, counts };
     }
 
-    /**************************************
-     * Build Dictionaries from Data
-     **************************************/
+    /******************* DICTIONARY BUILDERS *******************/
     function buildDictionaries(data) {
       const actualToPred = {};
       const predToGene = {};
@@ -142,7 +213,6 @@
         const predicted = row.Best_class;
         const keyAP = makeKey(actual, predicted);
         actualToPred[keyAP] = (actualToPred[keyAP] || 0) + 1;
-
         const { genes, counts } = parseGeneData(row);
         if (genes.length === counts.length) {
           genes.forEach((gene, i) => {
@@ -154,9 +224,6 @@
       return { actualToPred, predToGene };
     }
 
-    /**************************************
-     * Build Node Sets from Dictionaries
-     **************************************/
     function buildNodeSets(act2pred, pred2gene) {
       const actualNodes = new Set();
       const predictedNodes = new Set();
@@ -174,9 +241,6 @@
       return { actualNodes, predictedNodes, geneNodes };
     }
 
-    /**************************************
-     * Build Sankey Data
-     **************************************/
     function buildSankeyData(act2pred, pred2gene) {
       const nodeSets = buildNodeSets(act2pred, pred2gene);
       const allNodes = Array.from(new Set([
@@ -208,9 +272,7 @@
       return { allNodes, sources, targets, values };
     }
 
-    /**************************************
-     * Build Plotly Sankey Figure
-     **************************************/
+    /******************* PLOTLY SANKEY *******************/
     function buildSankeyFigure(nodes, sources, targets, values, title) {
       return {
         data: [{
@@ -236,9 +298,7 @@
       };
     }
 
-    /**************************************
-     * Dropdown Utilities
-     **************************************/
+    /******************* DROPDOWN UTILITIES *******************/
     function makeOptions(nodesSet) {
       return Array.from(nodesSet).sort().map(d => `<option value="${d}">${d}</option>`);
     }
@@ -276,9 +336,7 @@
       }
     }
 
-    /**************************************
-     * Filtering and Updating Sankey Diagram
-     **************************************/
+    /******************* FILTERING & UPDATE FOR SANKEY *******************/
     function updateSankey() {
       const selActual = document.getElementById("dropdown-actual").value;
       const selPredicted = document.getElementById("dropdown-predicted").value;
@@ -326,11 +384,104 @@
       updateDropdowns(filteredDicts, filteredData);
     }
 
-    /**************************************
-     * Initialization – Fetch Data & Setup
-     **************************************/
+    /******************* DATA TABLE FUNCTIONS *******************/
+    // Create the table headers and a row for filters.
+    function buildTableHeaders(columns) {
+      const headerRow = document.getElementById("table-header");
+      headerRow.innerHTML = "";
+      columns.forEach(col => {
+        const th = document.createElement("th");
+        th.innerText = col;
+        headerRow.appendChild(th);
+      });
+    }
+
+    // Create a row of dropdown filters for each column.
+    function buildFilterRow(columns, data) {
+      const filterPanel = document.getElementById("table-filters");
+      filterPanel.innerHTML = "";
+      columns.forEach(col => {
+        const container = document.createElement("div");
+        container.style.display = "inline-block";
+        container.style.marginRight = "10px";
+        const label = document.createElement("label");
+        label.innerText = col;
+        const select = document.createElement("select");
+        select.className = "filter-input";
+        // For each column, get unique values from data
+        const vals = new Set(data.map(d => d[col]));
+        let optionsHTML = '<option value="">(All)</option>';
+        Array.from(vals).sort().forEach(v => {
+          optionsHTML += `<option value="${v}">${v}</option>`;
+        });
+        select.innerHTML = optionsHTML;
+        select.addEventListener("change", updateTable);
+        // Save the column name in a data attribute for filtering
+        select.setAttribute("data-col", col);
+        container.appendChild(label);
+        container.appendChild(select);
+        filterPanel.appendChild(container);
+      });
+    }
+
+    // Build table body rows based on current filtered data.
+    function buildTableBody(data, columns) {
+      const tbody = document.getElementById("table-body");
+      tbody.innerHTML = "";
+      data.forEach(row => {
+        const tr = document.createElement("tr");
+        columns.forEach(col => {
+          const td = document.createElement("td");
+          td.innerText = row[col];
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Filter table data based on the dropdown selections above the table.
+    function updateTable() {
+      // Get current filter values
+      const filterInputs = document.querySelectorAll("#table-filters select");
+      let filtered = fullData.slice();
+      filterInputs.forEach(sel => {
+        const col = sel.getAttribute("data-col");
+        const val = sel.value;
+        if (val) {
+          filtered = filtered.filter(row => row[col] === val);
+        }
+      });
+      buildTableBody(filtered, tableColumns);
+    }
+
+    // Global variable: define the columns that appear in the table.
+    const tableColumns = ["cell_label", "Estimated_class", "Prob", "Best_class", "Actual_class", "Actual==Best_class", "top5_genes", "top5_gene_counts", "closest_cell_labels", "closest_cell_classes", "dist", "simulation"];
+
+    // Build full data table.
+    function buildDataTable() {
+      buildTableHeaders(tableColumns);
+      buildFilterRow(tableColumns, fullData);
+      buildTableBody(fullData, tableColumns);
+    }
+
+    /******************* TAB NAVIGATION *******************/
+    const tabLinks = document.querySelectorAll(".tab-link");
+    tabLinks.forEach(link => {
+      link.addEventListener("click", function() {
+        // Remove active class from all and hide all tab contents.
+        tabLinks.forEach(lnk => lnk.classList.remove("active"));
+        document.querySelectorAll(".tab-content").forEach(tab => tab.classList.remove("active"));
+        // Set the clicked tab active and show its content.
+        this.classList.add("active");
+        document.getElementById(this.getAttribute("data-target")).classList.add("active");
+      });
+    });
+
+    /******************* INITIALIZATION – Fetch Data & Setup *******************/
     d3.tsv("processed_simulations.tsv").then(function(data) {
       fullData = data;
+
+      // Build the Sankey diagram on the dashboard tab.
       const dicts = buildDictionaries(fullData);
       const sankeyData = buildSankeyData(dicts.actualToPred, dicts.predToGene);
       const fig = buildSankeyFigure(
@@ -342,15 +493,19 @@
       );
       Plotly.newPlot("sankey-container", fig.data, fig.layout);
       updateDropdowns(dicts, fullData);
+
+      // Build the data table on the Data Table tab.
+      buildDataTable();
     }).catch(function(error) {
       console.error("Error loading TSV data:", error);
     });
 
-    // Attach event listeners to dropdowns.
+    // Attach event listeners to Sankey dropdowns.
     document.getElementById("dropdown-actual").addEventListener("change", updateSankey);
     document.getElementById("dropdown-predicted").addEventListener("change", updateSankey);
     document.getElementById("dropdown-gene").addEventListener("change", updateSankey);
     document.getElementById("dropdown-simulation").addEventListener("change", updateSankey);
+
   </script>
 </body>
 </html>
