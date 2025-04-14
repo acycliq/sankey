@@ -50,7 +50,7 @@
     .tab-content.active {
       display: block;
     }
-    /* Common filter styling for dashboard dropdowns */
+    /* Filter panel for Sankey dashboard */
     .filter-panel {
       margin-bottom: 10px;
     }
@@ -60,10 +60,12 @@
       gap: 10px;
       flex-wrap: wrap;
       margin-bottom: 10px;
+      /*margin-left: -30px; !* Adjust to shift dropdowns further left *!*/
     }
     .dropdown-container {
       flex: 1;
       min-width: 140px;
+      margin-left: 0;
     }
     /* Simulation dropdown (smaller width) */
     #simulation-container select {
@@ -95,7 +97,7 @@
       margin-bottom: 15px;
     }
     /* Data table styling */
-    #data-table-container {
+    .data-table-container {
       overflow-x: auto;
     }
     table {
@@ -128,11 +130,12 @@
 
   <!-- Tab navigation -->
   <div class="tabs">
-    <button class="tab-link active" data-target="dashboard-tab">Dashboard</button>
-    <button class="tab-link" data-target="data-tab">Data Table</button>
+    <button class="tab-link active" data-target="dashboard-tab">Sankey Diagram</button>
+    <button class="tab-link" data-target="data-tab">Processed Simulations Data</button>
+    <button class="tab-link" data-target="scrna-tab">scRNAseq Data</button>
   </div>
 
-  <!-- Dashboard Tab: Sankey Diagram and linked dropdown filters -->
+  <!-- Tab 1: Sankey Dashboard -->
   <div id="dashboard-tab" class="tab-content active">
     <div class="filter-panel filter-row">
       <div class="dropdown-container" id="simulation-container">
@@ -163,26 +166,48 @@
     <div id="sankey-container"></div>
   </div>
 
-  <!-- Data Table Tab: Raw data grid with header filters (dropdowns) -->
+  <!-- Tab 2: Processed Simulations Data Table -->
   <div id="data-tab" class="tab-content">
-    <table id="data-table">
-      <thead>
-        <tr id="table-header">
-          <!-- Column headers will be inserted here -->
-        </tr>
-        <tr id="filter-row">
-          <!-- Filter dropdowns will be inserted here -->
-        </tr>
-      </thead>
-      <tbody id="table-body">
-        <!-- Data rows will be inserted here -->
-      </tbody>
-    </table>
+    <div class="data-table-container">
+      <table id="data-table">
+        <thead>
+          <tr id="table-header">
+            <!-- Headers will be inserted -->
+          </tr>
+          <tr id="filter-row">
+            <!-- Filter dropdowns will be inserted -->
+          </tr>
+        </thead>
+        <tbody id="table-body">
+          <!-- Data rows -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Tab 3: scRNAseq Data Table -->
+  <div id="scrna-tab" class="tab-content">
+    <div class="data-table-container">
+      <table id="scrna-table">
+        <thead>
+          <tr id="scrna-table-header">
+            <!-- Headers will be inserted -->
+          </tr>
+          <tr id="scrna-filter-row">
+            <!-- Filter dropdowns will be inserted -->
+          </tr>
+        </thead>
+        <tbody id="scrna-table-body">
+          <!-- Data rows -->
+        </tbody>
+      </table>
+    </div>
   </div>
 
   <script>
     /******************* GLOBAL VARIABLES *******************/
-    let fullData = [];
+    let fullData = [];           // Data from processed_simulations.tsv
+    let scrnaData = [];          // Data from scRNAseq_final.csv
 
     /******************* UTILITY FUNCTIONS *******************/
     function makeKey(...args) {
@@ -360,9 +385,7 @@
                         ? JSON.parse(d.top5_genes.replace(/'/g, '"'))
                         : d.top5_genes;
             return arr.includes(geneVal);
-          } catch (e) {
-            return false;
-          }
+          } catch (e) { return false; }
         });
       }
       if (selSimulation) {
@@ -384,11 +407,10 @@
       updateDashboardDropdowns(filteredDicts, filteredData);
     }
 
-    /******************* DATA TABLE FUNCTIONS *******************/
+    /******************* DATA TABLE FUNCTIONS FOR PROCESSED SIMULATIONS *******************/
     const tableColumns = ["cell_label", "Estimated_class", "Prob", "Best_class", "Actual_class", "Actual==Best_class", "top5_genes", "top5_gene_counts", "closest_cell_labels", "closest_cell_classes", "dist", "simulation"];
-
-    function buildTableHeaders(columns) {
-      const headerRow = document.getElementById("table-header");
+    function buildTableHeaders(columns, headerId) {
+      const headerRow = document.getElementById(headerId);
       headerRow.innerHTML = "";
       columns.forEach(col => {
         const th = document.createElement("th");
@@ -397,15 +419,14 @@
       });
     }
 
-    function buildFilterRow(columns, data) {
-      const filterRow = document.getElementById("filter-row");
+    function buildFilterRow(columns, data, filterRowId) {
+      const filterRow = document.getElementById(filterRowId);
       filterRow.innerHTML = "";
       columns.forEach(col => {
         const th = document.createElement("th");
         const select = document.createElement("select");
         select.className = "filter-select";
         select.setAttribute("data-col", col);
-        // For each column, get unique values from data
         const vals = new Set(data.map(d => d[col]));
         let optionsHTML = '<option value="">(All)</option>';
         Array.from(vals).sort().forEach(v => {
@@ -418,8 +439,8 @@
       });
     }
 
-    function buildTableBody(data, columns) {
-      const tbody = document.getElementById("table-body");
+    function buildTableBody(data, columns, tableBodyId) {
+      const tbody = document.getElementById(tableBodyId);
       tbody.innerHTML = "";
       data.forEach(row => {
         const tr = document.createElement("tr");
@@ -433,23 +454,91 @@
     }
 
     function updateTable() {
-      // Get current filter values from table header selects.
-      const selects = document.querySelectorAll("#filter-row select");
+      const filterSelects = document.querySelectorAll("#filter-row select");
       let filtered = fullData.slice();
-      selects.forEach(select => {
+      filterSelects.forEach(select => {
         const col = select.getAttribute("data-col");
         const val = select.value;
         if (val) {
           filtered = filtered.filter(row => row[col] === val);
         }
       });
-      buildTableBody(filtered, tableColumns);
+      buildTableBody(filtered, tableColumns, "table-body");
     }
 
     function buildDataTable() {
-      buildTableHeaders(tableColumns);
-      buildFilterRow(tableColumns, fullData);
-      buildTableBody(fullData, tableColumns);
+      buildTableHeaders(tableColumns, "table-header");
+      buildFilterRow(tableColumns, fullData, "filter-row");
+      buildTableBody(fullData, tableColumns, "table-body");
+    }
+
+    /******************* DATA TABLE FUNCTIONS FOR scRNAseq CSV *******************/
+    let scrnaTableColumns = []; // to be determined after loading CSV
+    function buildScrnaTableHeaders(columns) {
+      const headerRow = document.getElementById("scrna-table-header");
+      headerRow.innerHTML = "";
+      columns.forEach(col => {
+        const th = document.createElement("th");
+        th.innerText = col;
+        headerRow.appendChild(th);
+      });
+    }
+
+    function buildScrnaFilterRow(columns, data) {
+      const filterRow = document.getElementById("scrna-filter-row");
+      filterRow.innerHTML = "";
+      columns.forEach(col => {
+        const th = document.createElement("th");
+        const select = document.createElement("select");
+        select.className = "filter-select";
+        select.setAttribute("data-col", col);
+        const vals = new Set(data.map(d => d[col]));
+        let optionsHTML = '<option value="">(All)</option>';
+        Array.from(vals).sort().forEach(v => {
+          optionsHTML += `<option value="${v}">${v}</option>`;
+        });
+        select.innerHTML = optionsHTML;
+        select.addEventListener("change", updateScrnaTable);
+        th.appendChild(select);
+        filterRow.appendChild(th);
+      });
+    }
+
+    function buildScrnaTableBody(data, columns) {
+      const tbody = document.getElementById("scrna-table-body");
+      tbody.innerHTML = "";
+      data.forEach(row => {
+        const tr = document.createElement("tr");
+        columns.forEach(col => {
+          const td = document.createElement("td");
+          td.innerText = row[col];
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+    }
+
+    function updateScrnaTable() {
+      const filterSelects = document.querySelectorAll("#scrna-filter-row select");
+      let filtered = scrnaData.slice();
+      filterSelects.forEach(select => {
+        const col = select.getAttribute("data-col");
+        const val = select.value;
+        if (val) {
+          filtered = filtered.filter(row => row[col] === val);
+        }
+      });
+      buildScrnaTableBody(filtered, scrnaTableColumns);
+    }
+
+    function buildScrnaDataTable() {
+      // Build table headers and filter row once we determine the columns.
+      if (scrnaData.length > 0) {
+        scrnaTableColumns = Object.keys(scrnaData[0]);
+        buildScrnaTableHeaders(scrnaTableColumns);
+        buildScrnaFilterRow(scrnaTableColumns, scrnaData);
+        buildScrnaTableBody(scrnaData, scrnaTableColumns);
+      }
     }
 
     /******************* TAB NAVIGATION *******************/
@@ -464,6 +553,7 @@
     });
 
     /******************* INITIALIZATION – FETCH DATA & SETUP *******************/
+    // Load TSV for Sankey and Processed Simulations Data
     d3.tsv("processed_simulations.tsv").then(function(data) {
       fullData = data;
 
@@ -480,10 +570,18 @@
       Plotly.newPlot("sankey-container", fig.data, fig.layout);
       updateDashboardDropdowns(dicts, fullData);
 
-      // Build the data table.
+      // Build the processed simulations data table.
       buildDataTable();
     }).catch(function(error) {
       console.error("Error loading TSV data:", error);
+    });
+
+    // Load CSV for scRNAseq data table.
+    d3.csv("scRNAseq_final.csv").then(function(data) {
+      scrnaData = data;
+      buildScrnaDataTable();
+    }).catch(function(error) {
+      console.error("Error loading CSV data:", error);
     });
 
     // Attach event listeners to Sankey dropdowns.
