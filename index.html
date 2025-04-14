@@ -60,7 +60,7 @@
       gap: 10px;
       flex-wrap: wrap;
       margin-bottom: 10px;
-      /*margin-left: -30px; !* Adjust to shift dropdowns further left *!*/
+      /*margin-left: -30px; !* Shift dropdowns further left *!*/
     }
     .dropdown-container {
       flex: 1;
@@ -194,7 +194,7 @@
             <!-- Headers will be inserted -->
           </tr>
           <tr id="scrna-filter-row">
-            <!-- Filter dropdowns will be inserted -->
+            <!-- Filter dropdown for first column only -->
           </tr>
         </thead>
         <tbody id="scrna-table-body">
@@ -484,22 +484,28 @@
       });
     }
 
+    // For the scRNAseq filter row, add a dropdown only for the first column; other columns get empty header cells.
     function buildScrnaFilterRow(columns, data) {
       const filterRow = document.getElementById("scrna-filter-row");
       filterRow.innerHTML = "";
-      columns.forEach(col => {
+      columns.forEach((col, index) => {
         const th = document.createElement("th");
-        const select = document.createElement("select");
-        select.className = "filter-select";
-        select.setAttribute("data-col", col);
-        const vals = new Set(data.map(d => d[col]));
-        let optionsHTML = '<option value="">(All)</option>';
-        Array.from(vals).sort().forEach(v => {
-          optionsHTML += `<option value="${v}">${v}</option>`;
-        });
-        select.innerHTML = optionsHTML;
-        select.addEventListener("change", updateScrnaTable);
-        th.appendChild(select);
+        if (index === 0) {
+          // Only the first column gets a dropdown filter.
+          const select = document.createElement("select");
+          select.className = "filter-select";
+          select.setAttribute("data-col", col);
+          const vals = new Set(data.map(d => d[col]));
+          let optionsHTML = '<option value="">(All)</option>';
+          Array.from(vals).sort().forEach(v => {
+            optionsHTML += `<option value="${v}">${v}</option>`;
+          });
+          select.innerHTML = optionsHTML;
+          select.addEventListener("change", updateScrnaTable);
+          th.appendChild(select);
+        } else {
+          th.innerHTML = ""; // No filter for other columns.
+        }
         filterRow.appendChild(th);
       });
     }
@@ -519,20 +525,17 @@
     }
 
     function updateScrnaTable() {
-      const filterSelects = document.querySelectorAll("#scrna-filter-row select");
+      const select = document.querySelector("#scrna-filter-row select");
       let filtered = scrnaData.slice();
-      filterSelects.forEach(select => {
+      if (select && select.value) {
         const col = select.getAttribute("data-col");
         const val = select.value;
-        if (val) {
-          filtered = filtered.filter(row => row[col] === val);
-        }
-      });
+        filtered = filtered.filter(row => row[col] === val);
+      }
       buildScrnaTableBody(filtered, scrnaTableColumns);
     }
 
     function buildScrnaDataTable() {
-      // Build table headers and filter row once we determine the columns.
       if (scrnaData.length > 0) {
         scrnaTableColumns = Object.keys(scrnaData[0]);
         buildScrnaTableHeaders(scrnaTableColumns);
@@ -553,11 +556,9 @@
     });
 
     /******************* INITIALIZATION – FETCH DATA & SETUP *******************/
-    // Load TSV for Sankey and Processed Simulations Data
+    // Load TSV for Sankey & Processed Simulations Data
     d3.tsv("processed_simulations.tsv").then(function(data) {
       fullData = data;
-
-      // Build and show Sankey diagram.
       const dicts = buildDictionaries(fullData);
       const sankeyData = buildSankeyData(dicts.actualToPred, dicts.predToGene);
       const fig = buildSankeyFigure(
