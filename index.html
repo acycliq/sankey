@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Sankey Diagram – Misclassifications, Genes, Closest Cell Classes & Simulation Filter</title>
+  <title>Sankey Diagram – Simulation & Linked Dropdowns</title>
   <!-- Load Google Font -->
   <link href="https://fonts.googleapis.com/css?family=Open+Sans:400,600&display=swap" rel="stylesheet">
-  <!-- Load Plotly and d3 libraries from CDNs -->
+  <!-- Load Plotly and d3 libraries -->
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
   <script src="https://d3js.org/d3.v5.min.js"></script>
   <style>
@@ -21,6 +21,9 @@
       color: #2c3e50;
     }
     .filter-panel {
+      margin-bottom: 10px;
+    }
+    .filter-row {
       display: flex;
       flex-wrap: wrap;
       gap: 10px;
@@ -43,7 +46,7 @@
       border: 1px solid #ccc;
       border-radius: 4px;
       background-color: #fff;
-      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+      box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
       transition: border-color 0.2s ease-in-out;
     }
     select:focus {
@@ -55,13 +58,25 @@
       border: 1px solid #ddd;
       padding: 10px;
       background-color: #fff;
-      box-shadow: 0px 2px 6px rgba(0, 0, 0, 0.1);
+      box-shadow: 0px 2px 6px rgba(0,0,0,0.1);
     }
   </style>
 </head>
 <body>
-  <h2>Sankey Diagram – Misclassifications, Gene Contributions, Closest Cell Classes & Simulation Filter</h2>
+  <h2>Sankey Diagram – Misclassifications, Genes & Simulation Filter</h2>
+
+  <!-- First row: Simulation filter on its own -->
   <div class="filter-panel">
+    <div class="dropdown-container" style="max-width: 250px;">
+      <label for="dropdown-simulation">Select Simulation:</label>
+      <select id="dropdown-simulation">
+        <option value="">(All)</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Second row: The other three linked dropdowns -->
+  <div class="filter-panel filter-row">
     <div class="dropdown-container">
       <label for="dropdown-actual">Select Actual node:</label>
       <select id="dropdown-actual">
@@ -80,26 +95,15 @@
         <option value="">(All)</option>
       </select>
     </div>
-    <div class="dropdown-container">
-      <label for="dropdown-closest">Select Closest Cell Class:</label>
-      <select id="dropdown-closest">
-        <option value="">(All)</option>
-      </select>
-    </div>
-    <div class="dropdown-container">
-      <label for="dropdown-simulation">Select Simulation:</label>
-      <select id="dropdown-simulation">
-        <option value="">(All)</option>
-      </select>
-    </div>
   </div>
+
   <div id="sankey-container"></div>
 
   <script>
     /*******************
      * Global Variables
      *******************/
-    let fullData = []; // Array to store all rows from the TSV file.
+    let fullData = []; // Array to hold TSV data.
 
     /*******************
      * Utility Functions
@@ -108,7 +112,7 @@
       return args.join("|");
     }
 
-    // Parse top5 genes and counts from a row.
+    // Parse gene lists and counts from a row.
     function parseGeneData(row) {
       let genes = [];
       let counts = [];
@@ -129,26 +133,12 @@
       return { genes, counts };
     }
 
-    // Parse closest cell classes from a row.
-    function parseClosestData(row) {
-      let closest = [];
-      try {
-        closest = (typeof row.closest_cell_classes === 'string')
-                  ? JSON.parse(row.closest_cell_classes.replace(/'/g, '"'))
-                  : row.closest_cell_classes;
-      } catch (e) {
-        closest = [];
-      }
-      return closest;
-    }
-
     /**************************************
      * Build Dictionaries from Data
      **************************************/
     function buildDictionaries(data) {
       const actualToPred = {};
       const predToGene = {};
-      const predToClosest = {};
       data.forEach(row => {
         const actual = row.Actual_class;
         const predicted = row.Best_class;
@@ -162,26 +152,17 @@
             predToGene[keyPG] = (predToGene[keyPG] || 0) + parseFloat(counts[i]);
           });
         }
-
-        const closestClasses = parseClosestData(row);
-        if (Array.isArray(closestClasses)) {
-          closestClasses.forEach(cc => {
-            const keyPC = makeKey(predicted, cc);
-            predToClosest[keyPC] = (predToClosest[keyPC] || 0) + 1;
-          });
-        }
       });
-      return { actualToPred, predToGene, predToClosest };
+      return { actualToPred, predToGene };
     }
 
     /**************************************
      * Build Node Sets from Dictionaries
      **************************************/
-    function buildNodeSets(act2pred, pred2gene, pred2closest) {
+    function buildNodeSets(act2pred, pred2gene) {
       const actualNodes = new Set();
       const predictedNodes = new Set();
       const geneNodes = new Set();
-      const closestNodes = new Set();
 
       Object.keys(act2pred).forEach(key => {
         const [a, p] = key.split("|");
@@ -193,25 +174,18 @@
         predictedNodes.add("Predicted: " + p);
         geneNodes.add("Gene: " + gene);
       });
-      Object.keys(pred2closest).forEach(key => {
-        const [p, cc] = key.split("|");
-        predictedNodes.add("Predicted: " + p);
-        closestNodes.add("Closest: " + cc);
-      });
-
-      return { actualNodes, predictedNodes, geneNodes, closestNodes };
+      return { actualNodes, predictedNodes, geneNodes };
     }
 
     /**************************************
      * Build Sankey Data
      **************************************/
-    function buildSankeyData(act2pred, pred2gene, pred2closest) {
-      const nodeSets = buildNodeSets(act2pred, pred2gene, pred2closest);
+    function buildSankeyData(act2pred, pred2gene) {
+      const nodeSets = buildNodeSets(act2pred, pred2gene);
       const allNodes = Array.from(new Set([
         ...nodeSets.actualNodes,
         ...nodeSets.predictedNodes,
-        ...nodeSets.geneNodes,
-        ...nodeSets.closestNodes
+        ...nodeSets.geneNodes
       ]));
       const nodeIdx = {};
       allNodes.forEach((n, i) => nodeIdx[n] = i);
@@ -220,7 +194,7 @@
       const targets = [];
       const values = [];
 
-      // Actual → Predicted
+      // Actual → Predicted links.
       Object.keys(act2pred).forEach(key => {
         const [act, pred] = key.split("|");
         const src = "Actual: " + act;
@@ -230,7 +204,7 @@
         values.push(act2pred[key]);
       });
 
-      // Predicted → Gene
+      // Predicted → Gene links.
       Object.keys(pred2gene).forEach(key => {
         const [pred, gene] = key.split("|");
         const src = "Predicted: " + pred;
@@ -238,16 +212,6 @@
         sources.push(nodeIdx[src]);
         targets.push(nodeIdx[tgt]);
         values.push(pred2gene[key]);
-      });
-
-      // Predicted → Closest
-      Object.keys(pred2closest).forEach(key => {
-        const [pred, cc] = key.split("|");
-        const src = "Predicted: " + pred;
-        const tgt = "Closest: " + cc;
-        sources.push(nodeIdx[src]);
-        targets.push(nodeIdx[tgt]);
-        values.push(pred2closest[key]);
       });
 
       return { allNodes, sources, targets, values };
@@ -288,16 +252,16 @@
       return Array.from(nodesSet).sort().map(d => `<option value="${d}">${d}</option>`);
     }
 
-    // Build simulation options from the full data (simulation column).
+    // Build simulation options from the full data.
     function getUniqueSimulations(data) {
       const sims = new Set();
       data.forEach(d => sims.add(d.simulation));
       return sims;
     }
 
-    // Update dropdown menus for each node group.
+    // Update dropdown menus.
     function updateDropdowns(dicts, data) {
-      const nodeSets = buildNodeSets(dicts.actualToPred, dicts.predToGene, dicts.predToClosest);
+      const nodeSets = buildNodeSets(dicts.actualToPred, dicts.predToGene);
       function updateDropdown(id, setData) {
         const dropdown = document.getElementById(id);
         const current = dropdown.value;
@@ -312,9 +276,8 @@
       updateDropdown("dropdown-actual", nodeSets.actualNodes);
       updateDropdown("dropdown-predicted", nodeSets.predictedNodes);
       updateDropdown("dropdown-gene", nodeSets.geneNodes);
-      updateDropdown("dropdown-closest", nodeSets.closestNodes);
 
-      // Update simulation dropdown from full (or filtered) data.
+      // Update simulation dropdown.
       const simSet = getUniqueSimulations(data);
       const simDropdown = document.getElementById("dropdown-simulation");
       const currentSim = simDropdown.value;
@@ -328,13 +291,12 @@
     }
 
     /**************************************
-     * Filtering and Updating Sankey
+     * Filtering and Updating Sankey Diagram
      **************************************/
     function updateSankey() {
       const selActual = document.getElementById("dropdown-actual").value;
       const selPredicted = document.getElementById("dropdown-predicted").value;
       const selGene = document.getElementById("dropdown-gene").value;
-      const selClosest = document.getElementById("dropdown-closest").value;
       const selSimulation = document.getElementById("dropdown-simulation").value;
 
       let filteredData = fullData;
@@ -359,31 +321,17 @@
           }
         });
       }
-      if (selClosest) {
-        const closestVal = selClosest.replace("Closest: ", "").trim();
-        filteredData = filteredData.filter(d => {
-          try {
-            const arr = (typeof d.closest_cell_classes === 'string')
-                        ? JSON.parse(d.closest_cell_classes.replace(/'/g, '"'))
-                        : d.closest_cell_classes;
-            return arr.includes(closestVal);
-          } catch (e) {
-            return false;
-          }
-        });
-      }
       if (selSimulation) {
         filteredData = filteredData.filter(d => d.simulation === selSimulation);
       }
 
       const filteredDicts = buildDictionaries(filteredData);
-      const sankeyData = buildSankeyData(filteredDicts.actualToPred, filteredDicts.predToGene, filteredDicts.predToClosest);
+      const sankeyData = buildSankeyData(filteredDicts.actualToPred, filteredDicts.predToGene);
 
       let titleParts = [];
       if (selActual) titleParts.push(selActual);
       if (selPredicted) titleParts.push(selPredicted);
       if (selGene) titleParts.push(selGene);
-      if (selClosest) titleParts.push(selClosest);
       if (selSimulation) titleParts.push("Simulation: " + selSimulation);
       const title = titleParts.length ? "Focused view: " + titleParts.join(", ") : "Full Diagram";
 
@@ -398,7 +346,7 @@
     d3.tsv("processed_simulations.tsv").then(function(data) {
       fullData = data;
       const dicts = buildDictionaries(fullData);
-      const sankeyData = buildSankeyData(dicts.actualToPred, dicts.predToGene, dicts.predToClosest);
+      const sankeyData = buildSankeyData(dicts.actualToPred, dicts.predToGene);
       const fig = buildSankeyFigure(
         sankeyData.allNodes,
         sankeyData.sources,
@@ -412,11 +360,10 @@
       console.error("Error loading TSV data:", error);
     });
 
-    // Attach event listeners to all dropdowns.
+    // Attach event listeners to dropdowns.
     document.getElementById("dropdown-actual").addEventListener("change", updateSankey);
     document.getElementById("dropdown-predicted").addEventListener("change", updateSankey);
     document.getElementById("dropdown-gene").addEventListener("change", updateSankey);
-    document.getElementById("dropdown-closest").addEventListener("change", updateSankey);
     document.getElementById("dropdown-simulation").addEventListener("change", updateSankey);
   </script>
 </body>
