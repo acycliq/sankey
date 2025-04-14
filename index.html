@@ -5,7 +5,7 @@
   <title>Sankey & Data Dashboard</title>
   <!-- Google Fonts -->
   <link href="https://fonts.googleapis.com/css?family=Open+Sans:400,600&display=swap" rel="stylesheet">
-  <!-- Plotly and d3 -->
+  <!-- Plotly and D3 -->
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
   <script src="https://d3js.org/d3.v5.min.js"></script>
   <style>
@@ -123,6 +123,13 @@
       border: 1px solid #ccc;
       border-radius: 4px;
     }
+    /* Style for sortable header cells */
+    .sortable {
+      cursor: pointer;
+    }
+    .sortable:hover {
+      background-color: #f0f3f7;
+    }
   </style>
 </head>
 <body>
@@ -191,14 +198,14 @@
       <table id="scrna-table">
         <thead>
           <tr id="scrna-table-header">
-            <!-- Headers will be inserted -->
+            <!-- Headers will be inserted here. They are clickable to sort. -->
           </tr>
           <tr id="scrna-filter-row">
-            <!-- Filter dropdown for first column only -->
+            <!-- Only the first column gets a filter dropdown -->
           </tr>
         </thead>
         <tbody id="scrna-table-body">
-          <!-- Data rows -->
+          <!-- Data rows will be inserted here -->
         </tbody>
       </table>
     </div>
@@ -206,8 +213,10 @@
 
   <script>
     /******************* GLOBAL VARIABLES *******************/
-    let fullData = [];           // Data from processed_simulations.tsv
-    let scrnaData = [];          // Data from scRNAseq_final.csv
+    let fullData = [];         // Data from processed_simulations.tsv
+    let scrnaData = [];        // Data from scRNAseq_final.csv
+    let scrnaSortColumn = null;
+    let scrnaSortDirection = 1;  // 1 for ascending, -1 for descending
 
     /******************* UTILITY FUNCTIONS *******************/
     function makeKey(...args) {
@@ -361,7 +370,7 @@
       }
     }
 
-    /******************* FILTERING & UPDATE FOR SANKEY *******************/
+    /******************* UPDATE SANKEY FUNCTION *******************/
     function updateSankey() {
       const selActual = document.getElementById("dropdown-actual").value;
       const selPredicted = document.getElementById("dropdown-predicted").value;
@@ -407,7 +416,7 @@
       updateDashboardDropdowns(filteredDicts, filteredData);
     }
 
-    /******************* DATA TABLE FUNCTIONS FOR PROCESSED SIMULATIONS *******************/
+    /******************* PROCESSED SIMULATIONS DATA TABLE *******************/
     const tableColumns = ["cell_label", "Estimated_class", "Prob", "Best_class", "Actual_class", "Actual==Best_class", "top5_genes", "top5_gene_counts", "closest_cell_labels", "closest_cell_classes", "dist", "simulation"];
     function buildTableHeaders(columns, headerId) {
       const headerRow = document.getElementById(headerId);
@@ -472,26 +481,49 @@
       buildTableBody(fullData, tableColumns, "table-body");
     }
 
-    /******************* DATA TABLE FUNCTIONS FOR scRNAseq CSV *******************/
-    let scrnaTableColumns = []; // to be determined after loading CSV
+    /******************* scRNAseq DATA TABLE FUNCTIONS *******************/
+    let scrnaTableColumns = []; // will be set after loading CSV
     function buildScrnaTableHeaders(columns) {
       const headerRow = document.getElementById("scrna-table-header");
       headerRow.innerHTML = "";
-      columns.forEach(col => {
+      columns.forEach((col, index) => {
         const th = document.createElement("th");
         th.innerText = col;
+        // Make header cells clickable to sort
+        th.className = "sortable";
+        th.dataset.col = col;
+        th.addEventListener("click", function() {
+          const colName = this.dataset.col;
+          // Toggle sort direction if already sorting by this column
+          if (scrnaSortColumn === colName) {
+            scrnaSortDirection = -scrnaSortDirection;
+          } else {
+            scrnaSortColumn = colName;
+            scrnaSortDirection = 1;
+          }
+          // Try to parse numbers; if not numeric, sort as strings
+          scrnaData.sort((a,b) => {
+            let aVal = a[colName], bVal = b[colName];
+            const numA = parseFloat(aVal), numB = parseFloat(bVal);
+            if (!isNaN(numA) && !isNaN(numB)) {
+              return (numA - numB) * scrnaSortDirection;
+            } else {
+              return aVal.localeCompare(bVal) * scrnaSortDirection;
+            }
+          });
+          buildScrnaTableBody(scrnaData, scrnaTableColumns);
+        });
         headerRow.appendChild(th);
       });
     }
 
-    // For the scRNAseq filter row, add a dropdown only for the first column; other columns get empty header cells.
     function buildScrnaFilterRow(columns, data) {
       const filterRow = document.getElementById("scrna-filter-row");
       filterRow.innerHTML = "";
       columns.forEach((col, index) => {
         const th = document.createElement("th");
         if (index === 0) {
-          // Only the first column gets a dropdown filter.
+          // Only first column (assumed gene names) gets a dropdown filter.
           const select = document.createElement("select");
           select.className = "filter-select";
           select.setAttribute("data-col", col);
@@ -503,8 +535,6 @@
           select.innerHTML = optionsHTML;
           select.addEventListener("change", updateScrnaTable);
           th.appendChild(select);
-        } else {
-          th.innerHTML = ""; // No filter for other columns.
         }
         filterRow.appendChild(th);
       });
@@ -556,7 +586,7 @@
     });
 
     /******************* INITIALIZATION – FETCH DATA & SETUP *******************/
-    // Load TSV for Sankey & Processed Simulations Data
+    // Load TSV for Sankey and Processed Simulations Data
     d3.tsv("processed_simulations.tsv").then(function(data) {
       fullData = data;
       const dicts = buildDictionaries(fullData);
