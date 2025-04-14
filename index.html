@@ -50,7 +50,7 @@
     .tab-content.active {
       display: block;
     }
-    /* Common filter styling */
+    /* Common filter styling for dashboard dropdowns */
     .filter-panel {
       margin-bottom: 10px;
     }
@@ -65,7 +65,7 @@
       flex: 1;
       min-width: 140px;
     }
-    /* Special styling for simulation dropdown (smaller width) */
+    /* Simulation dropdown (smaller width) */
     #simulation-container select {
       width: 100px;
     }
@@ -73,6 +73,7 @@
       font-weight: 600;
       margin-bottom: 3px;
       color: #34495e;
+      display: block;
     }
     select {
       width: 100%;
@@ -111,7 +112,8 @@
       background-color: #e0e6ed;
       font-weight: 600;
     }
-    .filter-input {
+    /* Filter dropdowns inside table header */
+    .filter-select {
       width: 100%;
       box-sizing: border-box;
       padding: 4px 6px;
@@ -130,7 +132,7 @@
     <button class="tab-link" data-target="data-tab">Data Table</button>
   </div>
 
-  <!-- Dashboard Tab: Sankey Diagram and dropdown filters for Sankey -->
+  <!-- Dashboard Tab: Sankey Diagram and linked dropdown filters -->
   <div id="dashboard-tab" class="tab-content active">
     <div class="filter-panel filter-row">
       <div class="dropdown-container" id="simulation-container">
@@ -161,23 +163,21 @@
     <div id="sankey-container"></div>
   </div>
 
-  <!-- Data Table Tab: Raw data grid with column filters -->
+  <!-- Data Table Tab: Raw data grid with header filters (dropdowns) -->
   <div id="data-tab" class="tab-content">
-    <div class="filter-panel" id="table-filters">
-      <!-- Filters will be inserted here dynamically -->
-    </div>
-    <div id="data-table-container">
-      <table id="data-table">
-        <thead>
-          <tr id="table-header">
-            <!-- Column headers will be inserted here -->
-          </tr>
-        </thead>
-        <tbody id="table-body">
-          <!-- Data rows will be inserted here -->
-        </tbody>
-      </table>
-    </div>
+    <table id="data-table">
+      <thead>
+        <tr id="table-header">
+          <!-- Column headers will be inserted here -->
+        </tr>
+        <tr id="filter-row">
+          <!-- Filter dropdowns will be inserted here -->
+        </tr>
+      </thead>
+      <tbody id="table-body">
+        <!-- Data rows will be inserted here -->
+      </tbody>
+    </table>
   </div>
 
   <script>
@@ -307,7 +307,7 @@
       data.forEach(d => sims.add(d.simulation));
       return sims;
     }
-    function updateDropdowns(dicts, data) {
+    function updateDashboardDropdowns(dicts, data) {
       const nodeSets = buildNodeSets(dicts.actualToPred, dicts.predToGene);
       function updateDropdown(id, setData) {
         const dropdown = document.getElementById(id);
@@ -381,11 +381,12 @@
 
       const fig = buildSankeyFigure(sankeyData.allNodes, sankeyData.sources, sankeyData.targets, sankeyData.values, title);
       Plotly.react("sankey-container", fig.data, fig.layout);
-      updateDropdowns(filteredDicts, filteredData);
+      updateDashboardDropdowns(filteredDicts, filteredData);
     }
 
     /******************* DATA TABLE FUNCTIONS *******************/
-    // Create the table headers and a row for filters.
+    const tableColumns = ["cell_label", "Estimated_class", "Prob", "Best_class", "Actual_class", "Actual==Best_class", "top5_genes", "top5_gene_counts", "closest_cell_labels", "closest_cell_classes", "dist", "simulation"];
+
     function buildTableHeaders(columns) {
       const headerRow = document.getElementById("table-header");
       headerRow.innerHTML = "";
@@ -396,18 +397,14 @@
       });
     }
 
-    // Create a row of dropdown filters for each column.
     function buildFilterRow(columns, data) {
-      const filterPanel = document.getElementById("table-filters");
-      filterPanel.innerHTML = "";
+      const filterRow = document.getElementById("filter-row");
+      filterRow.innerHTML = "";
       columns.forEach(col => {
-        const container = document.createElement("div");
-        container.style.display = "inline-block";
-        container.style.marginRight = "10px";
-        const label = document.createElement("label");
-        label.innerText = col;
+        const th = document.createElement("th");
         const select = document.createElement("select");
-        select.className = "filter-input";
+        select.className = "filter-select";
+        select.setAttribute("data-col", col);
         // For each column, get unique values from data
         const vals = new Set(data.map(d => d[col]));
         let optionsHTML = '<option value="">(All)</option>';
@@ -416,15 +413,11 @@
         });
         select.innerHTML = optionsHTML;
         select.addEventListener("change", updateTable);
-        // Save the column name in a data attribute for filtering
-        select.setAttribute("data-col", col);
-        container.appendChild(label);
-        container.appendChild(select);
-        filterPanel.appendChild(container);
+        th.appendChild(select);
+        filterRow.appendChild(th);
       });
     }
 
-    // Build table body rows based on current filtered data.
     function buildTableBody(data, columns) {
       const tbody = document.getElementById("table-body");
       tbody.innerHTML = "";
@@ -439,14 +432,13 @@
       });
     }
 
-    // Filter table data based on the dropdown selections above the table.
     function updateTable() {
-      // Get current filter values
-      const filterInputs = document.querySelectorAll("#table-filters select");
+      // Get current filter values from table header selects.
+      const selects = document.querySelectorAll("#filter-row select");
       let filtered = fullData.slice();
-      filterInputs.forEach(sel => {
-        const col = sel.getAttribute("data-col");
-        const val = sel.value;
+      selects.forEach(select => {
+        const col = select.getAttribute("data-col");
+        const val = select.value;
         if (val) {
           filtered = filtered.filter(row => row[col] === val);
         }
@@ -454,10 +446,6 @@
       buildTableBody(filtered, tableColumns);
     }
 
-    // Global variable: define the columns that appear in the table.
-    const tableColumns = ["cell_label", "Estimated_class", "Prob", "Best_class", "Actual_class", "Actual==Best_class", "top5_genes", "top5_gene_counts", "closest_cell_labels", "closest_cell_classes", "dist", "simulation"];
-
-    // Build full data table.
     function buildDataTable() {
       buildTableHeaders(tableColumns);
       buildFilterRow(tableColumns, fullData);
@@ -468,20 +456,18 @@
     const tabLinks = document.querySelectorAll(".tab-link");
     tabLinks.forEach(link => {
       link.addEventListener("click", function() {
-        // Remove active class from all and hide all tab contents.
         tabLinks.forEach(lnk => lnk.classList.remove("active"));
         document.querySelectorAll(".tab-content").forEach(tab => tab.classList.remove("active"));
-        // Set the clicked tab active and show its content.
         this.classList.add("active");
         document.getElementById(this.getAttribute("data-target")).classList.add("active");
       });
     });
 
-    /******************* INITIALIZATION – Fetch Data & Setup *******************/
+    /******************* INITIALIZATION – FETCH DATA & SETUP *******************/
     d3.tsv("processed_simulations.tsv").then(function(data) {
       fullData = data;
 
-      // Build the Sankey diagram on the dashboard tab.
+      // Build and show Sankey diagram.
       const dicts = buildDictionaries(fullData);
       const sankeyData = buildSankeyData(dicts.actualToPred, dicts.predToGene);
       const fig = buildSankeyFigure(
@@ -492,9 +478,9 @@
         "Sankey Diagram: Misclassifications Flow & Gene Contributions"
       );
       Plotly.newPlot("sankey-container", fig.data, fig.layout);
-      updateDropdowns(dicts, fullData);
+      updateDashboardDropdowns(dicts, fullData);
 
-      // Build the data table on the Data Table tab.
+      // Build the data table.
       buildDataTable();
     }).catch(function(error) {
       console.error("Error loading TSV data:", error);
