@@ -46,7 +46,7 @@
       border: 1px solid #ccc;
       border-radius: 4px;
       background-color: #fff;
-      box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
       transition: border-color 0.2s ease-in-out;
     }
     select:focus {
@@ -58,25 +58,21 @@
       border: 1px solid #ddd;
       padding: 10px;
       background-color: #fff;
-      box-shadow: 0px 2px 6px rgba(0,0,0,0.1);
+      box-shadow: 0px 2px 6px rgba(0, 0, 0, 0.1);
     }
   </style>
 </head>
 <body>
   <h2>Sankey Diagram – Misclassifications, Genes & Simulation Filter</h2>
 
-  <!-- First row: Simulation filter on its own -->
-  <div class="filter-panel">
-    <div class="dropdown-container" style="max-width: 250px;">
+  <!-- All dropdowns in a single row, with Simulation at the far left -->
+  <div class="filter-panel filter-row">
+    <div class="dropdown-container">
       <label for="dropdown-simulation">Select Simulation:</label>
       <select id="dropdown-simulation">
         <option value="">(All)</option>
       </select>
     </div>
-  </div>
-
-  <!-- Second row: The other three linked dropdowns -->
-  <div class="filter-panel filter-row">
     <div class="dropdown-container">
       <label for="dropdown-actual">Select Actual node:</label>
       <select id="dropdown-actual">
