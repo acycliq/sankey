@@ -60,7 +60,6 @@
       gap: 10px;
       flex-wrap: wrap;
       margin-bottom: 10px;
-      /*margin-left: -30px; !* Shift dropdowns further left *!*/
     }
     .dropdown-container {
       flex: 1;
@@ -134,15 +133,15 @@
 </head>
 <body>
   <h2>Sankey & Data Dashboard</h2>
-
-  <!-- Tab navigation -->
+  <!-- Tab Navigation -->
   <div class="tabs">
     <button class="tab-link active" data-target="dashboard-tab">Sankey Diagram</button>
     <button class="tab-link" data-target="data-tab">Raw Data</button>
     <button class="tab-link" data-target="scrna-tab">scRNAseq Data</button>
+    <button class="tab-link" data-target="heatmap-tab">Correlation Heatmap</button>
   </div>
 
-  <!-- Tab 1: Sankey Dashboard -->
+  <!-- Tab 1: Sankey Diagram -->
   <div id="dashboard-tab" class="tab-content active">
     <div class="filter-panel filter-row">
       <div class="dropdown-container" id="simulation-container">
@@ -173,21 +172,15 @@
     <div id="sankey-container"></div>
   </div>
 
-  <!-- Tab 2: Processed Simulations Data Table -->
+  <!-- Tab 2: Raw Data Table -->
   <div id="data-tab" class="tab-content">
     <div class="data-table-container">
       <table id="data-table">
         <thead>
-          <tr id="table-header">
-            <!-- Headers will be inserted -->
-          </tr>
-          <tr id="filter-row">
-            <!-- Filter dropdowns will be inserted -->
-          </tr>
+          <tr id="table-header"></tr>
+          <tr id="filter-row"></tr>
         </thead>
-        <tbody id="table-body">
-          <!-- Data rows -->
-        </tbody>
+        <tbody id="table-body"></tbody>
       </table>
     </div>
   </div>
@@ -197,18 +190,17 @@
     <div class="data-table-container">
       <table id="scrna-table">
         <thead>
-          <tr id="scrna-table-header">
-            <!-- Headers will be inserted here. They are clickable to sort. -->
-          </tr>
-          <tr id="scrna-filter-row">
-            <!-- Only the first column gets a filter dropdown -->
-          </tr>
+          <tr id="scrna-table-header"></tr>
+          <tr id="scrna-filter-row"></tr>
         </thead>
-        <tbody id="scrna-table-body">
-          <!-- Data rows will be inserted here -->
-        </tbody>
+        <tbody id="scrna-table-body"></tbody>
       </table>
     </div>
+  </div>
+
+  <!-- Tab 4: Correlation Heatmap -->
+  <div id="heatmap-tab" class="tab-content">
+    <div id="heatmap-container"></div>
   </div>
 
   <script>
@@ -238,7 +230,7 @@
       return { genes, counts };
     }
 
-    /******************* DICTIONARY BUILDERS *******************/
+    /******************* DICTIONARY BUILDERS FOR SANKEY *******************/
     function buildDictionaries(data) {
       const actualToPred = {};
       const predToGene = {};
@@ -257,7 +249,6 @@
       });
       return { actualToPred, predToGene };
     }
-
     function buildNodeSets(act2pred, pred2gene) {
       const actualNodes = new Set();
       const predictedNodes = new Set();
@@ -274,7 +265,6 @@
       });
       return { actualNodes, predictedNodes, geneNodes };
     }
-
     function buildSankeyData(act2pred, pred2gene) {
       const nodeSets = buildNodeSets(act2pred, pred2gene);
       const allNodes = Array.from(new Set([
@@ -305,8 +295,6 @@
       });
       return { allNodes, sources, targets, values };
     }
-
-    /******************* PLOTLY SANKEY *******************/
     function buildSankeyFigure(nodes, sources, targets, values, title) {
       return {
         data: [{
@@ -416,7 +404,7 @@
       updateDashboardDropdowns(filteredDicts, filteredData);
     }
 
-    /******************* PROCESSED SIMULATIONS DATA TABLE *******************/
+    /******************* DATA TABLE FUNCTIONS *******************/
     const tableColumns = ["cell_label", "Estimated_class", "Prob", "Best_class", "Actual_class", "Actual==Best_class", "top5_genes", "top5_gene_counts", "closest_cell_labels", "closest_cell_classes", "dist", "simulation"];
     function buildTableHeaders(columns, headerId) {
       const headerRow = document.getElementById(headerId);
@@ -427,7 +415,6 @@
         headerRow.appendChild(th);
       });
     }
-
     function buildFilterRow(columns, data, filterRowId) {
       const filterRow = document.getElementById(filterRowId);
       filterRow.innerHTML = "";
@@ -447,7 +434,6 @@
         filterRow.appendChild(th);
       });
     }
-
     function buildTableBody(data, columns, tableBodyId) {
       const tbody = document.getElementById(tableBodyId);
       tbody.innerHTML = "";
@@ -461,7 +447,6 @@
         tbody.appendChild(tr);
       });
     }
-
     function updateTable() {
       const filterSelects = document.querySelectorAll("#filter-row select");
       let filtered = fullData.slice();
@@ -474,7 +459,6 @@
       });
       buildTableBody(filtered, tableColumns, "table-body");
     }
-
     function buildDataTable() {
       buildTableHeaders(tableColumns, "table-header");
       buildFilterRow(tableColumns, fullData, "filter-row");
@@ -494,15 +478,13 @@
         th.dataset.col = col;
         th.addEventListener("click", function() {
           const colName = this.dataset.col;
-          // Toggle sort direction if already sorting by this column
           if (scrnaSortColumn === colName) {
             scrnaSortDirection = -scrnaSortDirection;
           } else {
             scrnaSortColumn = colName;
             scrnaSortDirection = 1;
           }
-          // Try to parse numbers; if not numeric, sort as strings
-          scrnaData.sort((a,b) => {
+          scrnaData.sort((a, b) => {
             let aVal = a[colName], bVal = b[colName];
             const numA = parseFloat(aVal), numB = parseFloat(bVal);
             if (!isNaN(numA) && !isNaN(numB)) {
@@ -516,14 +498,12 @@
         headerRow.appendChild(th);
       });
     }
-
     function buildScrnaFilterRow(columns, data) {
       const filterRow = document.getElementById("scrna-filter-row");
       filterRow.innerHTML = "";
       columns.forEach((col, index) => {
         const th = document.createElement("th");
         if (index === 0) {
-          // Only first column (assumed gene names) gets a dropdown filter.
           const select = document.createElement("select");
           select.className = "filter-select";
           select.setAttribute("data-col", col);
@@ -539,7 +519,6 @@
         filterRow.appendChild(th);
       });
     }
-
     function buildScrnaTableBody(data, columns) {
       const tbody = document.getElementById("scrna-table-body");
       tbody.innerHTML = "";
@@ -553,7 +532,6 @@
         tbody.appendChild(tr);
       });
     }
-
     function updateScrnaTable() {
       const select = document.querySelector("#scrna-filter-row select");
       let filtered = scrnaData.slice();
@@ -564,7 +542,6 @@
       }
       buildScrnaTableBody(filtered, scrnaTableColumns);
     }
-
     function buildScrnaDataTable() {
       if (scrnaData.length > 0) {
         scrnaTableColumns = Object.keys(scrnaData[0]);
@@ -574,16 +551,70 @@
       }
     }
 
-    /******************* TAB NAVIGATION *******************/
-    const tabLinks = document.querySelectorAll(".tab-link");
-    tabLinks.forEach(link => {
-      link.addEventListener("click", function() {
-        tabLinks.forEach(lnk => lnk.classList.remove("active"));
-        document.querySelectorAll(".tab-content").forEach(tab => tab.classList.remove("active"));
-        this.classList.add("active");
-        document.getElementById(this.getAttribute("data-target")).classList.add("active");
-      });
-    });
+    /******************* CORRELATION HEATMAP FUNCTION *******************/
+  function renderHeatmap(xLabels, zMatrix) {
+    // These hex values match px.colors.get_colorscale("RdBu_r") from Python Plotly
+    // and yield the "vivid" reversed RdBu scale Plotly Express uses.
+    const rdBuReversedScale = [
+      [0.0,  'rgb(103,0,31)'],   // deep red
+      [0.1,  'rgb(178,24,43)'],
+      [0.2,  'rgb(214,96,77)'],
+      [0.3,  'rgb(244,165,130)'],
+      [0.4,  'rgb(253,219,199)'],
+      [0.5,  'rgb(247,247,247)'],  // white center
+      [0.6,  'rgb(209,229,240)'],
+      [0.7,  'rgb(146,197,222)'],
+      [0.8,  'rgb(67,147,195)'],
+      [0.9,  'rgb(33,102,172)'],
+      [1.0,  'rgb(5,48,97)']      // deep blue
+    ];
+
+    // Create the heatmap trace using the same scale stops as Python's "RdBu_r"
+    const trace = {
+      x: xLabels,
+      y: xLabels,
+      z: zMatrix,
+      type: 'heatmap',
+      // Use the custom scale array EXACTLY as in px.colors.get_colorscale("RdBu_r")
+      colorscale: rdBuReversedScale,
+      // Keep reversescale: false, because this array is ALREADY reversed
+      reversescale: true,
+      // Let Plotly auto-scale to data min & max => do NOT set zmin, zmax, or zauto: false
+      hovertemplate: 'x: %{x}<br>y: %{y}<br>Correlation: %{z:.2f}<extra></extra>',
+      colorbar: {
+        title: 'Correlation',
+        thickness: 15
+      }
+    };
+
+    // Layout: remove any forced width/height if you want an auto aspect ratio like Python
+    const layout = {
+      title: 'Correlation Matrix Heatmap',
+      xaxis: {
+        side: 'bottom',
+        tickangle: 45,
+        automargin: true
+      },
+      yaxis: {
+        autorange: 'reversed',
+        automargin: true
+      },
+      // Larger or smaller margins to taste
+      margin: { t: 60, r: 60, b: 120, l: 120 },
+      hovermode: 'closest',
+      plot_bgcolor: 'white',
+      paper_bgcolor: 'white',
+      font: { family: 'Open Sans, sans-serif', size: 12 },
+      width: 1200,
+      height: 900
+    };
+
+    // Responsive config if desired
+    const config = { responsive: true };
+
+    Plotly.newPlot('heatmap-container', [trace], layout, config);
+  }
+
 
     /******************* INITIALIZATION – FETCH DATA & SETUP *******************/
     // Load TSV for Sankey and Processed Simulations Data
@@ -600,27 +631,60 @@
       );
       Plotly.newPlot("sankey-container", fig.data, fig.layout);
       updateDashboardDropdowns(dicts, fullData);
-
-      // Build the processed simulations data table.
       buildDataTable();
     }).catch(function(error) {
       console.error("Error loading TSV data:", error);
     });
 
-    // Load CSV for scRNAseq data table.
+    // Load CSV for scRNAseq data and render both table and heatmap.
     d3.csv("scRNAseq_final.csv").then(function(data) {
       scrnaData = data;
       buildScrnaDataTable();
+
+      // Compute heatmap based on numeric columns
+      const allColumns = Object.keys(scrnaData[0]);
+      const numericCols = allColumns.filter(col => !isNaN(parseFloat(scrnaData[0][col])));
+      if (numericCols.length > 0) {
+        const corrMatrix = numericCols.map((_, i) =>
+          numericCols.map((_, j) => {
+            const colDataI = scrnaData.map(row => parseFloat(row[numericCols[i]]));
+            const colDataJ = scrnaData.map(row => parseFloat(row[numericCols[j]]));
+            const n = colDataI.length;
+            let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, sumY2 = 0;
+            for (let k = 0; k < n; k++) {
+              sumX += colDataI[k];
+              sumY += colDataJ[k];
+              sumXY += colDataI[k] * colDataJ[k];
+              sumX2 += colDataI[k] * colDataI[k];
+              sumY2 += colDataJ[k] * colDataJ[k];
+            }
+            const numerator = n * sumXY - sumX * sumY;
+            const denominator = Math.sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY));
+            return denominator === 0 ? 0 : numerator / denominator;
+          })
+        );
+        renderHeatmap(numericCols, corrMatrix);
+      }
     }).catch(function(error) {
       console.error("Error loading CSV data:", error);
     });
 
-    // Attach event listeners to Sankey dropdowns.
+    // Attach event listeners for Sankey dropdowns.
     document.getElementById("dropdown-actual").addEventListener("change", updateSankey);
     document.getElementById("dropdown-predicted").addEventListener("change", updateSankey);
     document.getElementById("dropdown-gene").addEventListener("change", updateSankey);
     document.getElementById("dropdown-simulation").addEventListener("change", updateSankey);
 
+    // Tab navigation event listeners.
+    const tabLinks = document.querySelectorAll(".tab-link");
+    tabLinks.forEach(link => {
+      link.addEventListener("click", function() {
+        tabLinks.forEach(lnk => lnk.classList.remove("active"));
+        document.querySelectorAll(".tab-content").forEach(tab => tab.classList.remove("active"));
+        this.classList.add("active");
+        document.getElementById(this.getAttribute("data-target")).classList.add("active");
+      });
+    });
   </script>
 </body>
 </html>
